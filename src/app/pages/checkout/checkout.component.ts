@@ -1,11 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { DataService } from '../../shared/services/data.service';
-import { switchMap, tap } from 'rxjs/operators';
+import { delay, switchMap, tap } from 'rxjs/operators';
 import { Store } from '../../shared/interfaces/stores.interface';
 import { NgForm } from '@angular/forms';
 import { Order, Details } from '../../shared/interfaces/order.interface';
 import { Product } from '../products/interfaces/product.interface';
 import { ShoppingCartService } from '../../shared/services/shopping-cart.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-checkout',
@@ -19,13 +20,14 @@ export class CheckoutComponent implements OnInit {
     shippingAddress: '',
     city: '',
   };
-  isDelivery = false;
+  isDelivery = true;
   stores: Store[] = [];
   cart: Product[] = [];
 
   constructor(
     private dataSvc: DataService,
-    private shoppingCartSvc: ShoppingCartService
+    private shoppingCartSvc: ShoppingCartService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -43,18 +45,19 @@ export class CheckoutComponent implements OnInit {
     const data: Order = {
       ...formData,
       date: this.getCurrentDay(),
-      pickup: this.isDelivery,
+      isDelivery: this.isDelivery,
     };
     this.dataSvc
       .saveOrder(data)
       .pipe(
         tap((res) => console.log('Order->', res)),
-        switchMap((order) => {
-          const orderId = order.id;
+        switchMap(({ id: orderId }) => {
           const details = this.prepareDetails();
           return this.dataSvc.saveDetailsOrder({ details, orderId });
         }),
-        tap((res) => console.log('Finish->', res))
+        tap(() => this.router.navigate(['/checkout/thanks-page'])),
+        delay(2000),
+        tap(() => this.shoppingCartSvc.resetCart())
       )
       .subscribe();
   }
@@ -72,8 +75,9 @@ export class CheckoutComponent implements OnInit {
 
   private prepareDetails(): Details[] {
     const details: Details[] = [];
-    this.cart.forEach((res) => {
-      console.log(res);
+    this.cart.forEach((product: Product) => {
+      const { id: productId, name: productName, quantity, stock } = product;
+      details.push({ productId, productName, quantity });
     });
     return details;
   }
