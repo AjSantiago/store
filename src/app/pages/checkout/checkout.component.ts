@@ -7,6 +7,7 @@ import { Order, Details } from '../../shared/interfaces/order.interface';
 import { Product } from '../products/interfaces/product.interface';
 import { ShoppingCartService } from '../../shared/services/shopping-cart.service';
 import { Router } from '@angular/router';
+import { ProductsService } from '../products/services/products.service';
 
 @Component({
   selector: 'app-checkout',
@@ -27,8 +28,11 @@ export class CheckoutComponent implements OnInit {
   constructor(
     private dataSvc: DataService,
     private shoppingCartSvc: ShoppingCartService,
-    private router: Router
-  ) {}
+    private router: Router,
+    private productsSvc: ProductsService
+  ) {
+    this.checkIfCartIsEmpty();
+  }
 
   ngOnInit(): void {
     this.getStores();
@@ -77,7 +81,11 @@ export class CheckoutComponent implements OnInit {
     const details: Details[] = [];
     this.cart.forEach((product: Product) => {
       const { id: productId, name: productName, quantity, stock } = product;
-      details.push({ productId, productName, quantity });
+      const updateStock = stock - quantity;
+      this.productsSvc
+        .updateStock(productId, updateStock)
+        .pipe(tap(() => details.push({ productId, productName, quantity })))
+        .subscribe();
     });
     return details;
   }
@@ -85,6 +93,18 @@ export class CheckoutComponent implements OnInit {
   private getDataCart(): void {
     this.shoppingCartSvc.cartAction$
       .pipe(tap((products: Product[]) => (this.cart = products)))
+      .subscribe();
+  }
+
+  private checkIfCartIsEmpty(): void {
+    this.shoppingCartSvc.cartAction$
+      .pipe(
+        tap((products: Product[]) => {
+          if (Array.isArray(products) && !products.length) {
+            this.router.navigate(['/products']);
+          }
+        })
+      )
       .subscribe();
   }
 }
